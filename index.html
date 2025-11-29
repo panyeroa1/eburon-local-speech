@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Live Transcribe + Gemini Translation (Single Page)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0b1020;
+      color: #f5f5f5;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 12px 18px;
+      border-bottom: 1px solid #252a3a;
+      background: linear-gradient(90deg, #111728, #161b30);
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    header p {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: #9ba3c0;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      gap: 12px;
+      padding: 12px;
+    }
+
+    @media (max-width: 900px) {
+      main {
+        flex-direction: column;
+      }
+    }
+
+    .panel {
+      background: #111624;
+      border-radius: 10px;
+      padding: 12px;
+      border: 1px solid #252a3a;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .panel h2 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #e5e9ff;
+    }
+
+    .panel.small {
+      flex: 0 0 320px;
+      max-width: 380px;
+    }
+
+    .panel.large {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .field-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+
+    .field-row label {
+      font-size: 12px;
+      color: #c1c7e2;
+      min-width: 80px;
+    }
+
+    .field-row input[type="text"],
+    .field-row input[type="password"],
+    .field-row select {
+      flex: 1;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: 1px solid #2e3548;
+      background: #050915;
+      color: #f5f5f5;
+      font-size: 12px;
+      outline: none;
+    }
+
+    .field-row input::placeholder {
+      color: #5c647c;
+    }
+
+    .field-row button {
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1px solid #2e3548;
+      background: #1e2a43;
+      color: #f5f5f5;
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .field-row button:hover:not(:disabled) {
+      background: #233153;
+    }
+
+    .field-row button:disabled {
+      opacity: 0.4;
+      cursor: default;
+    }
+
+    .subsection-title {
+      margin: 10px 0 4px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #c1c7e2;
+    }
+
+    .status {
+      margin-top: 4px;
+      padding: 4px 6px;
+      border-radius: 6px;
+      background: #050915;
+      border: 1px dashed #2e3548;
+      font-size: 11px;
+      color: #95a0c6;
+      min-height: 24px;
+    }
+
+    .transcript-container {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      min-height: 0;
+      margin-top: 8px;
+    }
+
+    .transcript-block {
+      background: #050915;
+      border-radius: 8px;
+      border: 1px solid #252a3a;
+      padding: 8px;
+      flex: 1;
+      min-height: 60px;
+      max-height: 180px;
+      overflow-y: auto;
+      font-size: 12px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+    }
+
+    .transcript-block.interim {
+      opacity: 0.7;
+      font-style: italic;
+    }
+
+    .yt-wrapper {
+      margin-top: 8px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #252a3a;
+      background: #050915;
+      position: relative;
+      padding-top: 56.25%; /* 16:9 */
+    }
+
+    .yt-wrapper iframe {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+
+    .translations {
+      flex: 1;
+      min-height: 0;
+      margin-top: 4px;
+      background: #050915;
+      border-radius: 8px;
+      border: 1px solid #252a3a;
+      padding: 8px;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+
+    .translation-item {
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px dashed #252a3a;
+    }
+
+    .translation-item:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .translation-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #8da2ff;
+      margin-bottom: 2px;
+    }
+
+    .translation-text {
+      font-size: 13px;
+      color: #f5f5f5;
+    }
+
+    footer {
+      padding: 6px 12px;
+      font-size: 10px;
+      color: #656f92;
+      border-top: 1px solid #252a3a;
+      background: #0b1020;
+    }
+
+    footer span {
+      opacity: 0.85;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Live Transcription → Gemini Translation → Spoken Output</h1>
+    <p>
+      Mic/WebSpeech creates a live transcript. Each final chunk is sent to Gemini for translation,
+      then spoken out in the selected language.
+    </p>
+  </header>
+
+  <main>
+    <!-- LEFT PANEL: CONTROL + SOURCE (YouTube + Mic) -->
+    <section class="panel small">
+      <h2>1. Source & Controls</h2>
+
+      <div class="field-row">
+        <label for="apiKey">Gemini API Key</label>
+        <input id="apiKey" type="password"
+               placeholder="Paste your Gemini API key here…" />
+      </div>
+
+      <div class="field-row">
+        <label for="model">Model</label>
+        <input id="model" type="text"
+               value="gemini-1.5-flash"
+               placeholder="e.g. gemini-1.5-flash" />
+      </div>
+
+      <div class="field-row">
+        <label for="sourceLang">Source (STT)</label>
+        <select id="sourceLang">
+          <option value="en-US">English (US)</option>
+          <option value="tl-PH">Filipino / Tagalog (PH)</option>
+          <option value="tr-TR">Turkish</option>
+          <option value="nl-BE">Dutch (Flemish)</option>
+          <option value="fr-FR">French</option>
+          <option value="de-DE">German</option>
+          <option value="es-ES">Spanish</option>
+        </select>
+      </div>
+
+      <div class="field-row">
+        <label for="targetLang">Target (TTS)</label>
+        <select id="targetLang">
+          <option value="en-US">English (US)</option>
+          <option value="tl-PH">Filipino / Tagalog (PH)</option>
+          <option value="tr-TR">Turkish</option>
+          <option value="nl-BE">Dutch (Flemish)</option>
+          <option value="fr-FR">French</option>
+          <option value="de-DE">German</option>
+          <option value="es-ES">Spanish</option>
+        </select>
+      </div>
+
+      <div class="field-row">
+        <label for="ytUrl">YouTube URL</label>
+        <input id="ytUrl" type="text"
+               placeholder="https://www.youtube.com/watch?v=5f4JvWeSInY" />
+        <button id="loadYt" type="button">Load</button>
+      </div>
+
+      <div class="yt-wrapper">
+        <iframe
+          id="ytPlayer"
+          src="https://www.youtube.com/embed/5f4JvWeSInY?rel=0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowfullscreen>
+        </iframe>
+      </div>
+
+      <div class="subsection-title">Mic + Web Speech</div>
+      <div class="field-row">
+        <button id="startBtn" type="button">Start Mic + Transcription</button>
+        <button id="stopBtn" type="button" disabled>Stop</button>
+      </div>
+
+      <div id="status" class="status"></div>
+    </section>
+
+    <!-- RIGHT PANEL: TRANSCRIPTS + TRANSLATIONS -->
+    <section class="panel large">
+      <h2>2. Live Transcript & Translation</h2>
+
+      <div class="transcript-container">
+        <div>
+          <div class="subsection-title">Final Transcript (Source language)</div>
+          <div id="finalTranscript" class="transcript-block"></div>
+        </div>
+
+        <div>
+          <div class="subsection-title">Interim (Still speaking…)</div>
+          <div id="interimTranscript" class="transcript-block interim"></div>
+        </div>
+      </div>
+
+      <div class="subsection-title" style="margin-top: 10px;">
+        Translated Output (Spoken via browser TTS)
+      </div>
+      <div id="translationLog" class="translations"></div>
+    </section>
+  </main>
+
+  <footer>
+    <span>
+      Notes:
+      Web Speech API can only hear the selected microphone.
+      To process Zoom/Meet/YouTube audio, route system audio to the mic input
+      (e.g. stereo mix / loopback) or play it near the mic.
+      Gemini is used purely as a translation engine: no extra commentary, only translated text.
+    </span>
+  </footer>
+</div>
+
+<script>
+  (function () {
+    const apiKeyInput       = document.getElementById("apiKey");
+    const modelInput        = document.getElementById("model");
+    const sourceLangSelect  = document.getElementById("sourceLang");
+    const targetLangSelect  = document.getElementById("targetLang");
+    const ytUrlInput        = document.getElementById("ytUrl");
+    const loadYtBtn         = document.getElementById("loadYt");
+    const ytFrame           = document.getElementById("ytPlayer");
+    const startBtn          = document.getElementById("startBtn");
+    const stopBtn           = document.getElementById("stopBtn");
+    const statusEl          = document.getElementById("status");
+    const finalTranscriptEl = document.getElementById("finalTranscript");
+    const interimTranscriptEl = document.getElementById("interimTranscript");
+    const translationLogEl  = document.getElementById("translationLog");
+
+    let recognition = null;
+    let recognizing = false;
+
+    let translationQueue = [];
+    let processingQueue = false;
+
+    function setStatus(msg) {
+      statusEl.textContent = msg || "";
+    }
+
+    function getLanguageLabel(langCode) {
+      const map = {
+        "en-US": "English (US)",
+        "tl-PH": "Filipino / Tagalog (PH)",
+        "tr-TR": "Turkish",
+        "nl-BE": "Dutch (Flemish)",
+        "fr-FR": "French",
+        "de-DE": "German",
+        "es-ES": "Spanish"
+      };
+      return map[langCode] || langCode;
+    }
+
+    function extractYouTubeId(url) {
+      try {
+        const u = new URL(url);
+        if (u.hostname === "youtu.be") {
+          return u.pathname.slice(1);
+        }
+        const v = u.searchParams.get("v");
+        if (v) return v;
+      } catch (e) {
+        // Ignore and fall through
+      }
+      const m = url.match(/(?:v=|youtu\.be\/)([\w-]{11})/);
+      return m ? m[1] : null;
+    }
+
+    function initRecognition() {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) {
+        alert("Web Speech API (SpeechRecognition) is not supported in this browser.");
+        return null;
+      }
+
+      const rec = new SR();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = sourceLangSelect.value;
+
+      rec.onstart = function () {
+        recognizing = true;
+        setStatus("Listening via microphone…");
+      };
+
+      rec.onend = function () {
+        recognizing = false;
+        setStatus("Stopped. Click Start to resume.");
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+      };
+
+      rec.onerror = function (event) {
+        console.error("SpeechRecognition error:", event);
+        setStatus("Speech error: " + event.error);
+      };
+
+      rec.onresult = function (event) {
+        let finalChunk = "";
+        let interim = "";
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const res = event.results[i];
+          const txt = res[0].transcript;
+          if (res.isFinal) {
+            finalChunk += txt + " ";
+          } else {
+            interim += txt;
+          }
+        }
+
+        if (finalChunk.trim().length > 0) {
+          finalTranscriptEl.textContent += finalChunk.trim() + "\n";
+          finalTranscriptEl.scrollTop = finalTranscriptEl.scrollHeight;
+          enqueueTranslation(finalChunk.trim());
+          interimTranscriptEl.textContent = "";
+        }
+
+        interimTranscriptEl.textContent = interim;
+      };
+
+      return rec;
+    }
+
+    function enqueueTranslation(text) {
+      if (!text) return;
+      translationQueue.push(text);
+      if (!processingQueue) {
+        processQueue().catch(err => {
+          console.error(err);
+        });
+      }
+    }
+
+    async function processQueue() {
+      if (processingQueue) return;
+      processingQueue = true;
+
+      while (translationQueue.length > 0) {
+        const chunk = translationQueue.shift();
+        try {
+          setStatus("Translating chunk via Gemini…");
+          const translated = await translateWithGemini(chunk);
+          if (translated) {
+            appendTranslation(chunk, translated);
+            speakTranslation(translated);
+          }
+        } catch (err) {
+          console.error("Translation error", err);
+          setStatus("Translation error: " + err.message);
+        }
+      }
+
+      setStatus("Idle. Listening / waiting for next chunk.");
+      processingQueue = false;
+    }
+
+    async function translateWithGemini(text) {
+      const key = (apiKeyInput.value || "").trim();
+      if (!key) {
+        setStatus("Please set your Gemini API key first.");
+        return null;
+      }
+
+      const model = (modelInput.value || "gemini-1.5-flash").trim();
+      const targetCode = targetLangSelect.value;
+      const targetLabel = getLanguageLabel(targetCode);
+
+      const url =
+        "https://generativelanguage.googleapis.com/v1beta/models/" +
+        encodeURIComponent(model) +
+        ":generateContent?key=" +
+        encodeURIComponent(key);
+
+      const prompt =
+        "You are a translation engine.\n" +
+        "Task: Translate the user text below into " + targetLabel + ".\n" +
+        "Rules:\n" +
+        "1) Output ONLY the translation text, no explanation, no comments.\n" +
+        "2) Do not add any prefixes or suffixes.\n" +
+        "3) Do not summarize, keep the meaning as close as possible.\n\n" +
+        "User text:\n\"\"\"" + text + "\"\"\"";
+
+      const body = {
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }]
+          }
+        ]
+      };
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error("Gemini API error: " + errText);
+      }
+
+      const data = await res.json();
+      const candidates = data.candidates || [];
+      if (!candidates.length || !candidates[0].content || !candidates[0].content.parts) {
+        return null;
+      }
+
+      const out = candidates[0].content.parts
+        .map(p => p.text || "")
+        .join("")
+        .trim();
+
+      return out || null;
+    }
+
+    function appendTranslation(sourceText, translatedText) {
+      const langLabel = getLanguageLabel(targetLangSelect.value);
+      const item = document.createElement("div");
+      item.className = "translation-item";
+
+      const labelEl = document.createElement("div");
+      labelEl.className = "translation-label";
+      labelEl.textContent = "→ " + langLabel;
+
+      const textEl = document.createElement("div");
+      textEl.className = "translation-text";
+      textEl.textContent = translatedText;
+
+      item.appendChild(labelEl);
+      item.appendChild(textEl);
+
+      translationLogEl.appendChild(item);
+      translationLogEl.scrollTop = translationLogEl.scrollHeight;
+    }
+
+    function speakTranslation(text) {
+      if (!("speechSynthesis" in window)) {
+        // Browser has no TTS, skip audio.
+        return;
+      }
+
+      const targetCode = targetLangSelect.value;
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = targetCode;
+      utter.rate = 1.0;
+      utter.pitch = 1.0;
+
+      // Try to match voice to language.
+      const voices = speechSynthesis.getVoices();
+      if (voices && voices.length) {
+        const exact = voices.find(v => v.lang === targetCode);
+        const base = targetCode.split("-")[0];
+        const partial = voices.find(v => v.lang.startsWith(base));
+        utter.voice = exact || partial || voices[0];
+      }
+
+      // Slight pause between chunks for more human cadence.
+      utter.onstart = function () {
+        // Could extend: add breathing / pauses via chunking.
+      };
+
+      speechSynthesis.speak(utter);
+    }
+
+    // Hook: voices may load asynchronously.
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.onvoiceschanged = function () {
+        // Just trigger loading; mapping happens in speakTranslation.
+        window.speechSynthesis.getVoices();
+      };
+    }
+
+    // Button: Start
+    startBtn.addEventListener("click", function () {
+      if (!recognition) {
+        recognition = initRecognition();
+      }
+      if (!recognition) return;
+
+      try {
+        recognition.lang = sourceLangSelect.value;
+        recognition.start();
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        setStatus("Starting microphone + live transcription…");
+      } catch (err) {
+        console.error("Error starting recognition", err);
+        setStatus("Cannot start recognition: " + err.message);
+      }
+    });
+
+    // Button: Stop
+    stopBtn.addEventListener("click", function () {
+      if (recognition && recognizing) {
+        recognition.stop();
+      }
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      setStatus("Stopping microphone…");
+    });
+
+    // Button: Load YouTube
+    loadYtBtn.addEventListener("click", function () {
+      const url = ytUrlInput.value.trim();
+      if (!url) return;
+      const id = extractYouTubeId(url);
+      if (!id) {
+        alert("Could not parse YouTube video ID from the URL.");
+        return;
+      }
+      const embedUrl = "https://www.youtube.com/embed/" + id + "?rel=0";
+      ytFrame.src = embedUrl;
+    });
+
+    // Initial status
+    setStatus("Idle. Paste your Gemini API key, load a YouTube URL if needed, then click Start.");
+  })();
+</script>
+</body>
+</html>
